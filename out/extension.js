@@ -27,9 +27,27 @@ exports.deactivate = exports.activate = void 0;
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 const vscode = __importStar(require("vscode"));
+const child_process_1 = require("child_process"); // 导入exec函数
 function isHexoProject(uri) {
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
     return workspaceFolder !== undefined && workspaceFolder.uri.fsPath.toLowerCase().includes("hexo");
+}
+function deployHexoBlog() {
+    return new Promise((resolve, reject) => {
+        //const options = { cwd: 'D:\\hexo_blog\\blog' }; // 替换为您的Hexo根目录
+        (0, child_process_1.exec)('cd D:\\hexo_blog\\blog & hexo cl & hexo g & hexo d', (error, stdout, stderr) => {
+            console.log('stdout:', stdout);
+            console.log('stderr:', stderr);
+            if (error) {
+                vscode.window.showErrorMessage(`🥵 Something wrong in deploying blog: ${error}`, { modal: true });
+                console.error(`exec error: ${error}`);
+                reject(error);
+                return;
+            }
+            vscode.window.showInformationMessage('🥳 Yes!Blog deployed successfully!');
+            resolve(stdout);
+        });
+    });
 }
 async function updateFrontMatter(document) {
     let editor = vscode.window.activeTextEditor;
@@ -49,17 +67,21 @@ async function updateFrontMatter(document) {
     else {
         frontMatter = `---
 title: 
+
+
 date: ${formattedNow}
 updated: ${formattedNow}
 tags: 
 ---
 `;
     }
+    let have_content = true;
     // 检查并填充title
     if (frontMatter.match(/title:\s*$/m)) { // 使用正则表达式匹配空的title
         const title = await vscode.window.showInputBox({ prompt: 'Enter title for the post:' });
         if (title) {
             frontMatter = frontMatter.replace(/title:\s*$/m, `title: ${title}`);
+            have_content = false;
         }
     }
     // 检查并填充tags
@@ -77,6 +99,10 @@ tags:
         }
         else {
             editBuilder.insert(new vscode.Position(0, 0), frontMatter);
+        }
+    }).then(async (success) => {
+        if (success && have_content) {
+            await deployHexoBlog(); // 等待部署完成
         }
     });
 }
